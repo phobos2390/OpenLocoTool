@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel;
+using System.Linq;
 using OpenLocoTool.DatFileParsing;
 using OpenLocoTool.Headers;
 
@@ -89,14 +90,14 @@ namespace OpenLocoTool.Objects
 		[property: LocoStructOffset(0x1A)] uint32_t var_1A,
 		[property: LocoStructOffset(0x1E)] uint8_t var_1E,
 		[property: LocoStructOffset(0x1F)] uint8_t var_1F,
-		//[property: LocoStructProperty(0x20)] const uint8_t* buildingPartHeight,    // This is the height of a building image
-		//[property: LocoStructProperty(0x24)] const BuildingPartAnimation* buildingPartAnimations, 
-		//[property: LocoStructProperty(0x28)] const uint8_t* animationSequences[4], // Access with getAnimationSequence helper method
-		//[property: LocoStructProperty(0x38)] const IndustryObjectUnk38* var_38,    // Access with getUnk38 helper method
-		//[property: LocoStructProperty(0x3C)] const uint8_t* buildingParts[32],     // Access with getBuildingParts helper method
+		[property: LocoStructOffset(0x20), LocoArrayLength(4)] uint8_t[] BuildingPartHeight,    // This is the height of a building image
+		[property: LocoStructOffset(0x24), LocoArrayLength(2)] BuildingPartAnimation[] BuildingPartAnimations, // This is 
+		[property: LocoStructOffset(0x28), LocoArrayLength(4)] uint32_t[] AnimationSequences, // Access with getAnimationSequence helper method (32 bit ptr)
+		[property: LocoStructOffset(0x38)] uint32_t var_38,    // Access with getUnk38 helper method (32 bit ptr)
+		[property: LocoStructOffset(0x3C), LocoArrayLength(32)] uint32_t[] BuildingParts,     // Access with getBuildingParts helper method (32 bit ptr)
 		[property: LocoStructOffset(0xBC)] uint8_t MinNumBuildings,
 		[property: LocoStructOffset(0xBD)] uint8_t MaxNumBuildings,
-		//[property: LocoStructProperty(0xBE)] const uint8_t* buildings,
+		[property: LocoStructOffset(0xBE)] uint32_t Buildings, // 32 bit ptr
 		[property: LocoStructOffset(0xC2)] uint32_t AvailableColours,  // bitset
 		[property: LocoStructOffset(0xC6)] uint32_t BuildingSizeFlags, // flags indicating the building types size 1:large4x4, 0:small1x1
 		[property: LocoStructOffset(0xCA)] uint16_t DesignedYear,
@@ -128,12 +129,21 @@ namespace OpenLocoTool.Objects
 
 		public static int AnimationSequencesSize = 4;
 
+		byte[] buildingHeight;
+		BuildingPartAnimation[] animationData;
+
 		public ReadOnlySpan<byte> Load(ReadOnlySpan<byte> remainingData)
 		{
 			// part heights
+			buildingHeight = remainingData.Slice(0, var_1E).ToArray();
 			remainingData = remainingData[(var_1E * 1)..]; // sizeof(uint8_t)
 
 			// part animations
+			animationData = remainingData.Slice(0, var_1E * BuildingPartAnimation.StructSize)
+				.ToArray()
+				.Chunk(BuildingPartAnimation.StructSize)
+				.Select(chunk => new BuildingPartAnimation(chunk[0], chunk[1]))
+				.ToArray();
 			remainingData = remainingData[(var_1E * BuildingPartAnimation.StructSize)..]; // sizeof(uint8_t)
 
 			// animation sequences
